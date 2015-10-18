@@ -1,0 +1,64 @@
+{
+    "variables" : {
+        "disk_size" : "20480",
+        "disk_format" : "qcow2",
+        "ssh_username" : "packer",
+        "ssh_password" : "packer",
+        "hostname" : "ubuntu"
+    },
+    "description" : "Build a Lubuntu Virtual Machine",
+    "builders": [
+        {
+            "type" : "qemu",
+            "name" : "from-netboot-iso",
+            "http_directory" : "http",
+            "iso_checksum" : "9660349cfbf158db3753904644deb065850d1f6ef329ae6177807571b088bd71",
+            "iso_checksum_type" : "sha256",
+            "iso_url" : "http://archive.ubuntu.com/ubuntu/dists/wily/main/installer-amd64/current/images/netboot/mini.iso",
+            "ssh_username" : "{{user `ssh_username`}}",
+            "ssh_password" : "{{user `ssh_password`}}",
+            "accelerator" : "kvm",
+            "boot_wait" : "3s",
+            "boot_command" : [
+                "<esc><wait>",
+                "/linux noapic preseed/url=http://{{.HTTPIP}}:{{.HTTPPort}}/preseed.cfg ",
+                "hostname={{user `hostname`}} ",
+                "debian-installer=en_US auto locale=en_US kbd-chooser/method=us ",
+                "fb=false ",
+                "keyboard-configuration/modelcode=SKIP keyboard-configuration/layout=USA ",
+                "keyboard-configuration/variant=USA console-setup/ask_detect=false ",
+                "initrd=/initrd.gz -- <enter>"
+            ],
+            "disk_size" : "{{user `disk_size`}}",
+            "format" : "{{user `disk_format`}}",
+            "headless" : false,
+            "shutdown_command" : "echo {{user `ssh_password`}} | sudo -S shutdown -P now",
+            "vm_name" : "ubuntu",
+            "qemuargs" : [
+                ["-vga", "qxl"]
+            ],
+            "ssh_wait_timeout" : "120m"
+        }
+    ],
+    "provisioners" : [
+        {
+            "type": "shell",
+            "inline": ["sleep 10"]
+        },
+        {
+            "type": "file",
+            "source" : "uploads/grains",
+            "destination": "/tmp/grains"
+        },
+        {
+            "type": "shell",
+            "execute_command" : "echo {{user `ssh_password`}} | {{ .Vars }} sudo -E -S sh '{{ .Path }}'",
+            "inline" : [
+                "mkdir /etc/salt", "mv /tmp/grains /etc/salt", "chown root:root /etc/salt/grains",
+                "apt-get -y install salt-minion"
+            ]
+        }
+    ],
+    "post-processors": [
+    ]
+}
